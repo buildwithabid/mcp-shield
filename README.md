@@ -44,32 +44,31 @@ MCP servers are the new attack surface for AI applications. Recent research has 
 
 ### Install and Run
 
-> **Not published to a registry yet.** Install from source with the steps below; the commands in this README assume you have done so.
-
 ```bash
-git clone https://github.com/BuildWithAbid/mcp-shield.git
-cd mcp-shield
-npm install && npm run build
-npm link            # makes `mcp-shield` available on your PATH
+# Run directly with npx (no install needed)
+npx @buildwithabid/mcp-shield scan <target>
+
+# Or install globally
+npm install -g @buildwithabid/mcp-shield
 ```
 
 ### Scan an MCP Server
 
 ```bash
 # Scan an npm package
-mcp-shield scan @modelcontextprotocol/server-filesystem
+npx @buildwithabid/mcp-shield scan @modelcontextprotocol/server-filesystem
 
 # Scan a local project
-mcp-shield scan ./my-mcp-server
+npx @buildwithabid/mcp-shield scan ./my-mcp-server
 
 # JSON output for CI/CD
-mcp-shield scan @some/mcp-server --format json
+npx @buildwithabid/mcp-shield scan @some/mcp-server --format json
 
 # Markdown report saved to file
-mcp-shield scan @some/mcp-server --format markdown --output report.md
+npx @buildwithabid/mcp-shield scan @some/mcp-server --format markdown --output report.md
 
 # Quick scan (skip slow checks like rug-pull detection)
-mcp-shield scan @some/mcp-server --quick
+npx @buildwithabid/mcp-shield scan @some/mcp-server --quick
 ```
 
 ### Example Output
@@ -178,10 +177,10 @@ mcp-shield also runs as an MCP server, so AI assistants can scan other MCP serve
 
 ```bash
 # Start the MCP server
-mcp-shield serve
+npx @buildwithabid/mcp-shield serve
 
 # Add to Claude Code
-claude mcp add mcp-shield -- mcp-shield serve
+claude mcp add mcp-shield -- npx @buildwithabid/mcp-shield serve
 ```
 
 ### Available MCP Tools
@@ -280,7 +279,7 @@ All 7 scanners run concurrently using `Promise.allSettled`, sharing a single fil
 
 ```bash
 # Fail the build if the MCP server has security issues
-mcp-shield scan ./my-mcp-server --format json
+npx @buildwithabid/mcp-shield scan ./my-mcp-server --format json
 # Exit code 1 if score < 70
 ```
 
@@ -288,21 +287,21 @@ mcp-shield scan ./my-mcp-server --format json
 
 ```bash
 # Check an MCP server package before installing it
-mcp-shield scan @unknown/mcp-server-database
+npx @buildwithabid/mcp-shield scan @unknown/mcp-server-database
 ```
 
 ### Security Audit
 
 ```bash
 # Generate a markdown report for a security review
-mcp-shield scan @company/internal-mcp-server --format markdown --output audit-report.md
+npx @buildwithabid/mcp-shield scan @company/internal-mcp-server --format markdown --output audit-report.md
 ```
 
 ### AI-Assisted Scanning
 
 ```bash
 # Let Claude scan MCP servers from within a conversation
-claude mcp add mcp-shield -- mcp-shield serve
+claude mcp add mcp-shield -- npx @buildwithabid/mcp-shield serve
 # Then ask: "Scan @modelcontextprotocol/server-filesystem for security issues"
 ```
 
