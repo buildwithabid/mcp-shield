@@ -44,12 +44,13 @@ MCP servers are the new attack surface for AI applications. Recent research has 
 
 ### Install and Run
 
-```bash
-# Run directly with npx (no install needed)
-npx @buildwithabid/mcp-shield scan <target>
+> **Not published to a registry yet.** Install from source with the steps below; the commands in this README assume you have done so.
 
-# Or install globally
-npm install -g @buildwithabid/mcp-shield
+```bash
+git clone https://github.com/BuildWithAbid/mcp-shield.git
+cd mcp-shield
+npm install && npm run build
+npm link            # makes `mcp-shield` available on your PATH
 ```
 
 ### Scan an MCP Server
@@ -177,10 +178,10 @@ mcp-shield also runs as an MCP server, so AI assistants can scan other MCP serve
 
 ```bash
 # Start the MCP server
-npx @buildwithabid/mcp-shield serve
+mcp-shield serve
 
 # Add to Claude Code
-claude mcp add mcp-shield -- npx @buildwithabid/mcp-shield serve
+claude mcp add mcp-shield -- mcp-shield serve
 ```
 
 ### Available MCP Tools
@@ -279,7 +280,7 @@ All 7 scanners run concurrently using `Promise.allSettled`, sharing a single fil
 
 ```bash
 # Fail the build if the MCP server has security issues
-npx @buildwithabid/mcp-shield scan ./my-mcp-server --format json
+mcp-shield scan ./my-mcp-server --format json
 # Exit code 1 if score < 70
 ```
 
@@ -287,21 +288,21 @@ npx @buildwithabid/mcp-shield scan ./my-mcp-server --format json
 
 ```bash
 # Check an MCP server package before installing it
-npx @buildwithabid/mcp-shield scan @unknown/mcp-server-database
+mcp-shield scan @unknown/mcp-server-database
 ```
 
 ### Security Audit
 
 ```bash
 # Generate a markdown report for a security review
-npx @buildwithabid/mcp-shield scan @company/internal-mcp-server --format markdown --output audit-report.md
+mcp-shield scan @company/internal-mcp-server --format markdown --output audit-report.md
 ```
 
 ### AI-Assisted Scanning
 
 ```bash
 # Let Claude scan MCP servers from within a conversation
-claude mcp add mcp-shield -- npx @buildwithabid/mcp-shield serve
+claude mcp add mcp-shield -- mcp-shield serve
 # Then ask: "Scan @modelcontextprotocol/server-filesystem for security issues"
 ```
 
