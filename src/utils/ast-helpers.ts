@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
-import { SCANNABLE_EXTENSIONS, SKIP_DIRS } from "./patterns.js";
+import { SCANNABLE_EXTENSIONS, SKIP_DIRS, SKIP_FILES, SKIP_FILE_RE } from "./patterns.js";
 
 /**
  * Recursively collect all scannable source files in a directory.
@@ -8,7 +8,29 @@ import { SCANNABLE_EXTENSIONS, SKIP_DIRS } from "./patterns.js";
 export async function collectSourceFiles(dir: string): Promise<string[]> {
   const files: string[] = [];
   await walkDir(dir, files);
-  return files;
+  return dropCompiledDuplicates(files);
+}
+
+/**
+ * Drop emitted JavaScript when the TypeScript it was compiled from sits beside it.
+ *
+ * Packages that ship both `src/foo.ts` and `src/foo.js` are publishing one
+ * implementation in two forms. Scanning both reports every finding twice, which
+ * silently doubles the severity counts for any package that ships its sources —
+ * good practice being punished. The `.ts` is kept because its line numbers are
+ * the ones a maintainer can act on.
+ */
+function dropCompiledDuplicates(files: string[]): string[] {
+  const COMPILED = new Set([".js", ".mjs", ".cjs"]);
+  const SOURCE = [".ts", ".tsx", ".mts", ".cts"];
+
+  const present = new Set(files);
+  return files.filter((f) => {
+    const ext = extname(f).toLowerCase();
+    if (!COMPILED.has(ext)) return true;
+    const stem = f.slice(0, -ext.length);
+    return !SOURCE.some((s) => present.has(stem + s));
+  });
 }
 
 async function walkDir(dir: string, files: string[]): Promise<void> {
@@ -26,6 +48,7 @@ async function walkDir(dir: string, files: string[]): Promise<void> {
     if (entry.isDirectory()) {
       await walkDir(fullPath, files);
     } else if (entry.isFile()) {
+      if (SKIP_FILES.has(entry.name) || SKIP_FILE_RE.test(entry.name)) continue;
       const ext = extname(entry.name).toLowerCase();
       // Also include extensionless dotfiles like .env
       if (SCANNABLE_EXTENSIONS.has(ext) || entry.name.startsWith(".env")) {

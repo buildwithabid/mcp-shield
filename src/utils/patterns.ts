@@ -220,3 +220,26 @@ export const SKIP_DIRS: ReadonlySet<string> = new Set([
   ".mypy_cache",
   ".pytest_cache",
 ]);
+
+/**
+ * Build and tooling scripts to skip.
+ *
+ * These run on the maintainer's machine at build time. They are not loaded when
+ * an MCP client connects, so they are not part of the server's attack surface —
+ * but they are exactly the files that legitimately shell out and write to disk,
+ * so scanning them produced high-severity findings for behaviour that can never
+ * reach a user.
+ */
+export const SKIP_FILES: ReadonlySet<string> = new Set([
+  "build.js",
+  "build.mjs",
+  "build.ts",
+  "gulpfile.js",
+  "Gruntfile.js",
+  "esbuild.config.js",
+  "esbuild.config.mjs",
+]);
+
+/** Matches config/tooling files such as vite.config.ts or webpack.config.js */
+export const SKIP_FILE_RE =
+  /^(?:rollup|webpack|vite|jest|vitest|babel|eslint|prettier|tsup|tailwind|postcss|commitlint)\.config\.[cm]?[jt]s$/;

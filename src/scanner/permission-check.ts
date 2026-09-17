@@ -50,7 +50,12 @@ function analyzeToolSchemas(content: string, relPath: string): Finding[] {
   }
 
   const execPatterns = [
-    { pattern: /(?:child_process|exec|execSync|spawn|spawnSync|execFile|execFileSync)\s*\(/, name: "child_process usage" },
+    // The leading (?<![.\w]) is load-bearing: without it this also matched
+    // `regex.exec(line)` and `pattern.exec(content)` — ordinary regex use,
+    // present in almost every codebase — and reported each one as
+    // high-severity shell execution. Only a bare `exec(` / `spawn(` etc.
+    // is a real child_process call.
+    { pattern: /(?<![.\w])(?:child_process|exec|execSync|spawn|spawnSync|execFile|execFileSync)\s*\(/, name: "child_process usage" },
     { pattern: /(?:require|import).*child_process/, name: "child_process import" },
   ];
 
@@ -170,11 +175,26 @@ function tryParseProperty(name: string, content: string, line: number, propertie
   }
 }
 
+/**
+ * Capability findings are still all reported — the severity decides how loudly.
+ *
+ * These are graded by how *unusual* a capability is for an MCP server, not by
+ * how alarming the API name sounds. Reading files and serving HTTP is what most
+ * of these servers are for, so rating them high/medium meant the genuinely
+ * interesting findings — eval, a shell call, a hardcoded key — arrived in the
+ * same colour as `fs.readFile`. High should mean "look at this now".
+ *
+ * Deliberately unchanged: eval() and the Function constructor stay critical.
+ */
 const CAPABILITY_PATTERNS = [
-  { pattern: /fs\.(writeFile|unlink|rmdir|rm|rename|chmod|chown)/, name: "Filesystem write operation", severity: "high" as const },
-  { pattern: /fs\.(readFile|readdir|stat|access)/, name: "Filesystem read operation", severity: "medium" as const },
-  { pattern: /net\.(createServer|connect|Socket)/, name: "Network server/socket", severity: "high" as const },
-  { pattern: /http\.createServer|https\.createServer/, name: "HTTP server creation", severity: "medium" as const },
+  // Writing/deleting files is worth surfacing, but it is ordinary for a server
+  // that caches tokens or manages a workspace.
+  { pattern: /fs\.(writeFile|unlink|rmdir|rm|rename|chmod|chown)/, name: "Filesystem write operation", severity: "medium" as const },
+  // Reading files is near-universal and on its own tells you nothing.
+  { pattern: /fs\.(readFile|readdir|stat|access)/, name: "Filesystem read operation", severity: "low" as const },
+  { pattern: /net\.(createServer|connect|Socket)/, name: "Network server/socket", severity: "medium" as const },
+  // A Streamable HTTP MCP server does this by definition.
+  { pattern: /http\.createServer|https\.createServer/, name: "HTTP server creation", severity: "low" as const },
   { pattern: /eval\s*\(/, name: "eval() usage", severity: "critical" as const },
   { pattern: /new\s+Function\s*\(/, name: "Function constructor", severity: "critical" as const },
   { pattern: /process\.env/, name: "Environment variable access", severity: "low" as const },

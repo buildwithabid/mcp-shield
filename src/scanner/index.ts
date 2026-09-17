@@ -90,10 +90,26 @@ function countSeverities(findings: Finding[]): SeverityCounts {
   return counts;
 }
 
+/**
+ * Score a package from 0-100.
+ *
+ * Each finding is still reported at its own severity; this only decides how the
+ * headline number is produced. Penalties grow with the square root of the count
+ * and are capped per severity, for two reasons:
+ *
+ *  - A flat per-finding penalty saturated immediately. Seven high findings put
+ *    any package at zero, so a 400-tool server with three shell calls scored the
+ *    same as genuinely malicious code. Above the threshold the number carried no
+ *    information at all.
+ *  - The tenth instance of a pattern tells you much less than the first. Ten
+ *    filesystem writes in one package is usually one design decision, not ten
+ *    independent problems.
+ *
+ * Small counts are unchanged: a single high finding still costs 15, so packages
+ * that scored well before score exactly the same now.
+ */
 function calculateScore(findings: Finding[]): number {
-  let score = 100;
-
-  const penalties: Record<Severity, number> = {
+  const unit: Record<Severity, number> = {
     critical: 25,
     high: 15,
     medium: 5,
@@ -102,11 +118,29 @@ function calculateScore(findings: Finding[]): number {
     pass: 0,
   };
 
+  // Ceiling on how much any one severity can remove, so a long tail of
+  // low-severity noise can never sink a package on its own.
+  const cap: Record<Severity, number> = {
+    critical: 60,
+    high: 40,
+    medium: 20,
+    low: 8,
+    info: 0,
+    pass: 0,
+  };
+
+  const counts = new Map<Severity, number>();
   for (const f of findings) {
-    score -= penalties[f.severity];
+    counts.set(f.severity, (counts.get(f.severity) ?? 0) + 1);
   }
 
-  return Math.max(0, Math.min(100, score));
+  let score = 100;
+  for (const [severity, count] of counts) {
+    if (!unit[severity]) continue;
+    score -= Math.min(cap[severity], unit[severity] * Math.sqrt(count));
+  }
+
+  return Math.round(Math.max(0, Math.min(100, score)));
 }
 
 const SEVERITY_ORDER: Record<Severity, number> = {
