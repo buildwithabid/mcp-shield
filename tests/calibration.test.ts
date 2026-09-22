@@ -47,6 +47,20 @@ describe("false-positive calibration", () => {
     expect(shell.length).toBeGreaterThan(0);
   });
 
+  it("does not report words ending in -eval as eval()", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "shield-eval-"));
+    const cache = await cacheOf(dir, {
+      "tool.js": [
+        'const description = `Do NOT use this tool for immediate data retrieval (time words like "today")`;',
+        "const retrieval = (x) => x; retrieval (1);",
+      ].join("\n"),
+      "danger.js": "module.exports = (input) => eval(input);\nwindow.eval (code);",
+    });
+    const findings = await permissionCheckScanner.run(cfg(dir), cache);
+    const evals = findings.filter((f) => f.title === "eval() usage");
+    expect(evals.map((f) => f.file)).toEqual(["danger.js", "danger.js"]);
+  });
+
   it("skips emitted .js when the .ts it came from sits beside it", async () => {
     const dir = await mkdtemp(join(tmpdir(), "shield-dup-"));
     await writeFile(join(dir, "server.ts"), "export const a = 1;", "utf-8");

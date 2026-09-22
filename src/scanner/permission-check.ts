@@ -195,7 +195,8 @@ const CAPABILITY_PATTERNS = [
   { pattern: /net\.(createServer|connect|Socket)/, name: "Network server/socket", severity: "medium" as const },
   // A Streamable HTTP MCP server does this by definition.
   { pattern: /http\.createServer|https\.createServer/, name: "HTTP server creation", severity: "low" as const },
-  { pattern: /eval\s*\(/, name: "eval() usage", severity: "critical" as const },
+  // \b so prose such as "data retrieval (e.g. ...)" in a tool description is not eval.
+  { pattern: /\beval\s*\(/, name: "eval() usage", severity: "critical" as const },
   { pattern: /new\s+Function\s*\(/, name: "Function constructor", severity: "critical" as const },
   { pattern: /process\.env/, name: "Environment variable access", severity: "low" as const },
 ];
