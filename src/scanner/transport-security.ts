@@ -38,7 +38,10 @@ export const transportSecurityScanner: Scanner = {
 };
 
 function checkInsecureHttp({ line, file, lineNum, findings }: LineContext): void {
-  const httpPattern = /["'`]http:\/\/(?!localhost|127\.0\.0\.1|0\.0\.0\.0|::1)[^"'`\s]+["'`]/g;
+  // Loopback never leaves the machine, so plain HTTP to it is not a transport
+  // risk. The host must end there (port, path, query, fragment or closing quote):
+  // "localhost.evil.com" is a remote host and is still flagged.
+  const httpPattern = /["'`]http:\/\/(?!(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])[:/?#"'`])[^"'`\s]+["'`]/g;
   if (httpPattern.test(line)) {
     findings.push({
       scanner: "transport-security",

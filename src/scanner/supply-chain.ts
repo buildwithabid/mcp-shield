@@ -56,10 +56,13 @@ async function checkNpmRegistry(packageName: string): Promise<Finding[]> {
       const daysSincePublish = Math.floor(
         (Date.now() - new Date(publishDate).getTime()) / (1000 * 60 * 60 * 24)
       );
+      // Informational only: actively maintained packages, official ones
+      // included, publish every few days, so a recent date says nothing about
+      // intent. Still reported, but it costs no score.
       if (daysSincePublish < 30) {
         findings.push({
           scanner: "supply-chain",
-          severity: "high",
+          severity: "info",
           title: "Recently published package",
           description: `Package was published/updated ${daysSincePublish} days ago. New packages have limited community vetting.`,
           remediation: "Verify the package author and source code manually before trusting new packages.",

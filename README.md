@@ -79,17 +79,17 @@ npx @buildwithabid/mcp-shield scan @some/mcp-server --quick
 Scanning: @example/mcp-server-db v2.1.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔴 CRITICAL  Supply Chain: Package published 3 days ago
 🔴 CRITICAL  Tool Injection: Hidden instruction pattern in tool "query"
 🟠 HIGH      Permissions: Unconstrained shell commands in tool "execute"
 🟠 HIGH      Secrets: Hardcoded API key in src/config.ts:14
 🟡 MEDIUM    Dependencies: 2 moderate CVEs in transitive dependencies
 🟢 LOW       Transport: CORS allows all origins
+ℹ️  INFO      Supply Chain: Package published 3 days ago
 ✅ PASS      Rug-Pull: Tool descriptions are static
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Score: 28/100 (FAIL)
-3 critical · 2 high · 1 medium · 1 low · 1 pass
+Score: 47/100 (FAIL)
+1 critical · 2 high · 1 medium · 1 low · 1 pass
 ```
 
 ---
@@ -150,7 +150,7 @@ Finds hardcoded secrets in source code and `.env` files:
 
 Checks transport-layer configuration:
 
-- HTTP instead of HTTPS for remote endpoints
+- HTTP instead of HTTPS for remote endpoints (loopback `localhost`, `127.0.0.1`, `0.0.0.0` and `[::1]` is exempt)
 - Permissive CORS (`Access-Control-Allow-Origin: *`)
 - Credentials with wildcard CORS origin
 - Auth tokens in URL query strings
@@ -162,7 +162,7 @@ Checks transport-layer configuration:
 Checks npm metadata and package integrity:
 
 - **Typosquatting detection** via Levenshtein distance against known MCP packages
-- Recently published packages (< 30 days)
+- Recently published packages (< 30 days), reported as info with no score penalty
 - Single-maintainer risk
 - Packages mimicking official naming
 - Suspicious install scripts (`preinstall`, `postinstall`)
@@ -237,7 +237,7 @@ Each finding deducts from a 100-point score:
 | High | -15 | Unrestricted shell commands, prompt injection |
 | Medium | -5 | Permissive CORS, missing repo declaration |
 | Low | -2 | Single maintainer, CORS on local server |
-| Info | 0 | Informational notes |
+| Info | 0 | Recently published package, other informational notes |
 | Pass | 0 | Check passed cleanly |
 
 **Score >= 70** = PASS. **Score < 70** = FAIL (exit code 1 for CI/CD integration).

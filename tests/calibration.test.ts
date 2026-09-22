@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import type { ScanConfig, FileCache, Finding } from "../src/types.js";
 import { permissionCheckScanner } from "../src/scanner/permission-check.js";
+import { transportSecurityScanner } from "../src/scanner/transport-security.js";
 import { collectSourceFiles } from "../src/utils/ast-helpers.js";
 import { runScan } from "../src/scanner/index.js";
 
@@ -59,6 +60,32 @@ describe("false-positive calibration", () => {
     const findings = await permissionCheckScanner.run(cfg(dir), cache);
     const evals = findings.filter((f) => f.title === "eval() usage");
     expect(evals.map((f) => f.file)).toEqual(["danger.js", "danger.js"]);
+  });
+
+  it("does not flag plain HTTP to loopback, still flags every other host", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "shield-http-"));
+    const loopback = [
+      '"http://localhost"',
+      '"http://localhost:3000/mcp"',
+      "'http://127.0.0.1:8080'",
+      "`http://0.0.0.0/health`",
+      '"http://[::1]:3000/sse"',
+      '"http://localhost?debug=1"',
+    ];
+    const remote = [
+      '"http://example.com"',
+      '"http://localhost.evil.com/x"',
+      '"http://127.0.0.1.nip.io"',
+      '"http://10.0.0.5:8080/api"',
+      "`http://${host}/mcp`",
+    ];
+    const cache = await cacheOf(dir, {
+      "urls.js": [...loopback, ...remote].map((u) => `fetch(${u});`).join("\n"),
+    });
+    const findings = await transportSecurityScanner.run(cfg(dir), cache);
+    const flagged = findings.filter((f) => f.title === "Insecure HTTP endpoint").map((f) => f.line);
+    const remoteLines = remote.map((_, i) => loopback.length + i + 1);
+    expect(flagged).toEqual(remoteLines);
   });
 
   it("skips emitted .js when the .ts it came from sits beside it", async () => {
