@@ -74,22 +74,30 @@ npx @buildwithabid/mcp-shield scan @some/mcp-server --quick
 ### Example Output
 
 ```
-🛡️  mcp-shield v1.0.0 — MCP Security Scanner
+🛡️  mcp-shield v1.1.1 — MCP Security Scanner
+
+Resolving target: @example/mcp-server-db...
+Scanning: @example/mcp-server-db v2.1.0
+
+
+🛡️  mcp-shield — MCP Security Scanner
 
 Scanning: @example/mcp-server-db v2.1.0
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔴 CRITICAL  Tool Injection: Hidden instruction pattern in tool "query"
-🟠 HIGH      Permissions: Unconstrained shell commands in tool "execute"
-🟠 HIGH      Secrets: Hardcoded API key in src/config.ts:14
-🟡 MEDIUM    Dependencies: 2 moderate CVEs in transitive dependencies
-🟢 LOW       Transport: CORS allows all origins
-ℹ️  INFO      Supply Chain: Package published 3 days ago
+🔴 CRITICAL  Permissions: Unrestricted shell command: "command" (dist/tools/execute.js:18)
+🟠 HIGH      Secrets: Generic API Key Assignment detected (dist/config.js:14)
+🟠 HIGH      Transport: Insecure HTTP endpoint (dist/client.js:31)
+🟡 MEDIUM    Transport: Permissive CORS configuration (dist/server.js:9)
+🟢 LOW       Supply Chain: Single maintainer
+ℹ️  INFO      Supply Chain: Recently published package
+✅ PASS      Dependencies: No known vulnerabilities
+✅ PASS      Tool Injection: No prompt injection patterns detected
 ✅ PASS      Rug-Pull: Tool descriptions are static
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Score: 47/100 (FAIL)
-1 critical · 2 high · 1 medium · 1 low · 1 pass
+1 critical · 2 high · 1 medium · 1 low · 3 pass
 ```
 
 ---
@@ -159,15 +167,22 @@ Checks transport-layer configuration:
 
 ### 7. Supply Chain Analysis
 
-Checks npm metadata and package integrity:
+Checks npm metadata and package integrity.
+
+Package scans query the npm registry:
 
 - **Typosquatting detection** via Levenshtein distance against known MCP packages
 - Recently published packages (< 30 days), reported as info with no score penalty
 - Single-maintainer risk
 - Packages mimicking official naming
-- Suspicious install scripts (`preinstall`, `postinstall`)
+- Missing or minimal package description
+
+Local scans read the project's `package.json` scripts:
+
+- Suspicious lifecycle scripts (`preinstall`, `postinstall`, `preuninstall`, `postuninstall`)
 - Scripts downloading remote code
-- Missing repository declaration
+
+Both: missing repository declaration.
 
 ---
 
@@ -187,8 +202,8 @@ claude mcp add mcp-shield -- npx @buildwithabid/mcp-shield serve
 
 | Tool | Description |
 |------|-------------|
-| `scan_package` | Scan an npm MCP server package by name |
-| `scan_local` | Scan a local directory for security issues |
+| `scan_package` | Scan an npm MCP server package by name (package scan) |
+| `scan_local` | Scan a local directory for security issues (local scan) |
 | `get_report` | Get the last scan report (JSON, Markdown, or terminal format) |
 
 ---
@@ -200,24 +215,45 @@ claude mcp add mcp-shield -- npx @buildwithabid/mcp-shield serve
 ```
 Usage: mcp-shield scan [options] <target>
 
+Scan an MCP server package or local directory for security vulnerabilities
+
 Arguments:
-  target                  npm package name or local path to scan
+  target                 npm package name or local path to scan
 
 Options:
-  -f, --format <format>   Output format: terminal, json, markdown (default: "terminal")
-  -o, --output <file>     Write report to file instead of stdout
-  -q, --quick             Skip slow checks like rug-pull detection
-  -h, --help              Display help
+  -f, --format <format>  Output format: terminal, json, markdown (default: "terminal")
+  -o, --output <file>    Write report to file
+  -q, --quick            Skip slow checks (rug-pull detection) (default: false)
+  -h, --help             display help for command
 ```
 
 ```
 Usage: mcp-shield serve [options]
 
-Start mcp-shield as an MCP server (stdio transport)
+Run mcp-shield as an MCP server
 
 Options:
-  -h, --help   Display help
+  -h, --help  display help for command
 ```
+
+`mcp-shield --version` prints the installed version. With `--output`, the report is written to the file and also printed. The MCP server uses the stdio transport.
+
+A target that starts with `.`, `/` or `~`, or is any absolute path, is a local path; anything else is looked up on npm. Relative paths resolve against the current directory, absolute paths are used as given, and a leading `~` expands to your home directory.
+
+### What Gets Scanned
+
+mcp-shield reads source and config files under the target: JavaScript and TypeScript, Python, JSON, YAML, TOML, INI and XML config, `.env` files, shell scripts, and Ruby, Go, Rust, Java, Kotlin, C#, PHP and Terraform files. Which directories it skips depends on the kind of scan:
+
+| Directories | Local scan (a path on disk) | Package scan (downloaded from npm) |
+|-------------|-----------------------------|------------------------------------|
+| `node_modules/`, `.git/`, `coverage/`, `__pycache__/`, `.venv/`, `venv/`, `.tox/`, `.mypy_cache/`, `.pytest_cache/` | Skipped | Skipped |
+| `dist/`, `build/`, `out/`, `.next/` | Skipped: this is your own build output, and bundled chunks produce false findings for code you never wrote | Scanned: it is often the only code a published package ships |
+
+In both kinds of scan mcp-shield also skips:
+
+- Build tooling that never reaches a client: `build.js`/`.mjs`/`.ts`, `gulpfile.js`, `Gruntfile.js`, `esbuild.config.js`/`.mjs`, and `rollup`, `webpack`, `vite`, `jest`, `vitest`, `babel`, `eslint`, `prettier`, `tsup`, `tailwind`, `postcss` and `commitlint` config files
+- Compiled `.js` when the `.ts` it came from sits beside it, and a `.d.ts` when its `.js` sits beside it, so each finding is reported once
+- Files larger than 1 MB
 
 ### Output Formats
 
@@ -229,18 +265,20 @@ Options:
 
 ### Scoring System
 
-Each finding deducts from a 100-point score:
+Every scan starts at 100. Findings are counted per severity, and each severity deducts `unit × √count`, up to a cap:
 
-| Severity | Penalty | Example |
-|----------|---------|---------|
-| Critical | -25 | eval() usage, hardcoded AWS key, typosquatting |
-| High | -15 | Unrestricted shell commands, prompt injection |
-| Medium | -5 | Permissive CORS, missing repo declaration |
-| Low | -2 | Single maintainer, CORS on local server |
-| Info | 0 | Recently published package, other informational notes |
-| Pass | 0 | Check passed cleanly |
+| Severity | Unit | Cap | 1 finding | 4 findings | Cap reached at | Examples |
+|----------|------|-----|-----------|------------|----------------|----------|
+| Critical | 25 | 60 | -25 | -50 | 6 findings | eval(), unrestricted shell command, TLS verification disabled, AWS key, typosquatting |
+| High | 15 | 40 | -15 | -30 | 8 findings | child_process call, insecure HTTP endpoint, generic API key, unrestricted file path |
+| Medium | 5 | 20 | -5 | -10 | 16 findings | Filesystem write, permissive CORS, no repository declared |
+| Low | 2 | 8 | -2 | -4 | 16 findings | Filesystem read, environment variable access, single maintainer |
+| Info | 0 | 0 | 0 | 0 | never | Recently published package, audit could not run |
+| Pass | 0 | 0 | 0 | 0 | never | Check passed cleanly |
 
-**Score >= 70** = PASS. **Score < 70** = FAIL (exit code 1 for CI/CD integration).
+The result is rounded and never goes below 0. The square root means the tenth instance of a pattern costs less than the first. The cap means no single severity can sink a package on its own: a long tail of low findings costs at most 8 points. The example above scores 100 − 25 − 15×√2 − 5 − 2 = 46.8, shown as 47.
+
+**Score ≥ 70** = PASS. **Score < 70** = FAIL. The CLI exits with code 0 on PASS and 1 on FAIL (also 1 if the target cannot be resolved), and 2 if the scan itself errors, so CI can gate on it.
 
 ### Architecture
 
