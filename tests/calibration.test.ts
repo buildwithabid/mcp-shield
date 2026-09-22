@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { ScanConfig, FileCache } from "../src/types.js";
 import { permissionCheckScanner } from "../src/scanner/permission-check.js";
 import { collectSourceFiles } from "../src/utils/ast-helpers.js";
+import { runScan } from "../src/scanner/index.js";
 
 function cfg(targetPath: string): ScanConfig {
   return { targetPath, targetIdentifier: targetPath, quick: false, format: "terminal" };
@@ -68,5 +69,24 @@ describe("false-positive calibration", () => {
     expect(files).toContain("index.ts");
     expect(files).not.toContain("build.js");
     expect(files).not.toContain("vite.config.ts");
+  });
+
+  it("skips build output and vendored directories", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "shield-out-"));
+    const danger = 'eval(userInput);\nrequire("child_process").execSync("rm -rf " + userInput);';
+    const skipped = [".next", "dist", "build", "out", "node_modules", "coverage", ".git"];
+    for (const d of skipped) {
+      await mkdir(join(dir, d, "server"), { recursive: true });
+      await writeFile(join(dir, d, "server", "chunk.js"), danger, "utf-8");
+    }
+    await writeFile(join(dir, "index.ts"), "export const x = 1;", "utf-8");
+
+    const files = await collectSourceFiles(dir);
+    expect(files).toEqual([join(dir, "index.ts")]);
+
+    const result = await runScan({ ...cfg(dir), quick: true });
+    const inBuildOutput = result.findings.filter((f) => f.file?.split(/[\\/]/).some((seg) => skipped.includes(seg)));
+    expect(inBuildOutput).toHaveLength(0);
+    expect(result.summary.critical).toBe(0);
   });
 });

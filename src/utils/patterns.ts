@@ -212,6 +212,8 @@ export const SKIP_DIRS: ReadonlySet<string> = new Set([
   ".git",
   "dist",
   "build",
+  "out",
+  ".next",
   "coverage",
   "__pycache__",
   ".venv",

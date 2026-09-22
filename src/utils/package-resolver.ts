@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { mkdtemp, rm, access, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -25,11 +25,19 @@ export async function resolveTarget(target: string): Promise<ResolvedPackage> {
 }
 
 function isLocalPath(target: string): boolean {
-  return target.startsWith(".") || target.startsWith("/") || target.startsWith("~");
+  return target.startsWith(".") || isAbsolute(target) || target.startsWith("~");
+}
+
+/** Expand a leading "~" — the shell leaves it alone when quoted, and MCP tool calls never see a shell. */
+function expandHome(target: string): string {
+  if (target === "~" || target.startsWith("~/")) return join(homedir(), target.slice(1));
+  return target;
 }
 
 async function resolveLocalPath(target: string): Promise<ResolvedPackage> {
-  const resolvedPath = join(process.cwd(), target);
+  // resolve() keeps absolute paths as given; join(process.cwd(), target) turned
+  // "/srv/server" into "<cwd>/srv/server" and the scan failed with "not found".
+  const resolvedPath = resolve(expandHome(target));
   try {
     await access(resolvedPath);
   } catch {
