@@ -56,6 +56,7 @@ program
       targetIdentifier: target,
       packageName: resolved.isTemp ? resolved.name : undefined,
       packageVersion: resolved.version,
+      mode: resolved.isTemp ? "package" : "local",
       quick: options.quick,
       format,
       outputFile: options.output,

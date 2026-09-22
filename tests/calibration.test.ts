@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { ScanConfig, FileCache } from "../src/types.js";
+import { join, relative, sep } from "node:path";
+import type { ScanConfig, FileCache, Finding } from "../src/types.js";
 import { permissionCheckScanner } from "../src/scanner/permission-check.js";
 import { collectSourceFiles } from "../src/utils/ast-helpers.js";
 import { runScan } from "../src/scanner/index.js";
@@ -59,6 +59,18 @@ describe("false-positive calibration", () => {
     expect(files).toContain("standalone.js");
   });
 
+  it("skips a .d.ts beside the .js it was emitted with, keeps a standalone one", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "shield-dts-"));
+    await writeFile(join(dir, "const.js"), 'export const apiKey = "e97714a64e2b4b8b8fe0b01cd8592870";', "utf-8");
+    await writeFile(join(dir, "const.d.ts"), 'export declare const apiKey: "e97714a64e2b4b8b8fe0b01cd8592870";', "utf-8");
+    await writeFile(join(dir, "types.d.ts"), "export type Id = string;", "utf-8");
+
+    const files = (await collectSourceFiles(dir, "package")).map((f) => f.split("/").pop());
+    expect(files).toContain("const.js");
+    expect(files).not.toContain("const.d.ts");
+    expect(files).toContain("types.d.ts");
+  });
+
   it("skips build tooling that never ships to a client", async () => {
     const dir = await mkdtemp(join(tmpdir(), "shield-build-"));
     await writeFile(join(dir, "build.js"), 'require("child_process").execSync("tsc");', "utf-8");
@@ -71,22 +83,48 @@ describe("false-positive calibration", () => {
     expect(files).not.toContain("vite.config.ts");
   });
 
-  it("skips build output and vendored directories", async () => {
+  it("local scans skip build output and vendored directories", async () => {
     const dir = await mkdtemp(join(tmpdir(), "shield-out-"));
-    const danger = 'eval(userInput);\nrequire("child_process").execSync("rm -rf " + userInput);';
     const skipped = [".next", "dist", "build", "out", "node_modules", "coverage", ".git"];
-    for (const d of skipped) {
-      await mkdir(join(dir, d, "server"), { recursive: true });
-      await writeFile(join(dir, d, "server", "chunk.js"), danger, "utf-8");
-    }
+    for (const d of skipped) await plant(dir, d);
     await writeFile(join(dir, "index.ts"), "export const x = 1;", "utf-8");
 
-    const files = await collectSourceFiles(dir);
+    const files = await collectSourceFiles(dir, "local");
     expect(files).toEqual([join(dir, "index.ts")]);
 
-    const result = await runScan({ ...cfg(dir), quick: true });
-    const inBuildOutput = result.findings.filter((f) => f.file?.split(/[\\/]/).some((seg) => skipped.includes(seg)));
-    expect(inBuildOutput).toHaveLength(0);
+    const result = await runScan({ ...cfg(dir), mode: "local", quick: true });
+    expect(findingsUnder(result.findings, skipped)).toHaveLength(0);
     expect(result.summary.critical).toBe(0);
   });
+
+  it("package scans read build output, since it is often all a package ships", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "shield-pkg-"));
+    const shipped = ["dist", "build", "out", "lib"];
+    const skipped = ["node_modules", "coverage", ".git"];
+    for (const d of [...shipped, ...skipped]) await plant(dir, d);
+
+    const files = (await collectSourceFiles(dir, "package")).map((f) => relative(dir, f).split(sep)[0]);
+    expect(files.sort()).toEqual([...shipped].sort());
+
+    const result = await runScan({ ...cfg(dir), mode: "package", quick: true });
+    expect(result.summary.critical).toBeGreaterThan(0);
+    const inDist = findingsUnder(result.findings, ["dist"]);
+    expect(inDist.some((f) => f.severity === "critical")).toBe(true);
+    expect(inDist.some((f) => f.title.toLowerCase().includes("shell execution"))).toBe(true);
+    expect(findingsUnder(result.findings, skipped)).toHaveLength(0);
+  });
 });
+
+/** Write a file with eval() and a child_process call into <dir>/<sub>/server/chunk.js */
+async function plant(dir: string, sub: string): Promise<void> {
+  await mkdir(join(dir, sub, "server"), { recursive: true });
+  await writeFile(
+    join(dir, sub, "server", "chunk.js"),
+    'eval(userInput);\nrequire("child_process").execSync("rm -rf " + userInput);',
+    "utf-8"
+  );
+}
+
+function findingsUnder(findings: Finding[], dirs: string[]): Finding[] {
+  return findings.filter((f) => f.file?.split(/[\\/]/).some((seg) => dirs.includes(seg)));
+}

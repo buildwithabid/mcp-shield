@@ -29,7 +29,7 @@ export async function runScan(config: ScanConfig): Promise<ScanResult> {
     : ALL_SCANNERS;
 
   // Collect files and read contents once, shared across all scanners
-  const files = await collectSourceFiles(config.targetPath);
+  const files = await collectSourceFiles(config.targetPath, config.mode);
   const contents = new Map<string, string>();
   await Promise.all(
     files.map(async (filePath) => {

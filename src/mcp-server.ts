@@ -33,6 +33,7 @@ export async function startMcpServer(): Promise<void> {
           targetIdentifier: package_name,
           packageName: resolved.name,
           packageVersion: resolved.version,
+          mode: resolved.isTemp ? "package" : "local",
           quick,
           format: "json",
         };
@@ -63,6 +64,7 @@ export async function startMcpServer(): Promise<void> {
           targetPath: resolved.path,
           targetIdentifier: path,
           packageVersion: resolved.version,
+          mode: resolved.isTemp ? "package" : "local",
           quick,
           format: "json",
         };

@@ -1,13 +1,19 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
-import { SCANNABLE_EXTENSIONS, SKIP_DIRS, SKIP_FILES, SKIP_FILE_RE } from "./patterns.js";
+import type { ScanMode } from "../types.js";
+import { BUILD_OUTPUT_DIRS, SCANNABLE_EXTENSIONS, SKIP_DIRS, SKIP_FILES, SKIP_FILE_RE } from "./patterns.js";
+
+const LOCAL_SKIP_DIRS: ReadonlySet<string> = new Set([...SKIP_DIRS, ...BUILD_OUTPUT_DIRS]);
 
 /**
  * Recursively collect all scannable source files in a directory.
+ *
+ * Local scans skip build output; package scans read it, because a published
+ * package often ships nothing else (see BUILD_OUTPUT_DIRS).
  */
-export async function collectSourceFiles(dir: string): Promise<string[]> {
+export async function collectSourceFiles(dir: string, mode: ScanMode = "local"): Promise<string[]> {
   const files: string[] = [];
-  await walkDir(dir, files);
+  await walkDir(dir, files, mode === "package" ? SKIP_DIRS : LOCAL_SKIP_DIRS);
   return dropCompiledDuplicates(files);
 }
 
@@ -19,13 +25,23 @@ export async function collectSourceFiles(dir: string): Promise<string[]> {
  * silently doubles the severity counts for any package that ships its sources —
  * good practice being punished. The `.ts` is kept because its line numbers are
  * the ones a maintainer can act on.
+ *
+ * Likewise a `foo.d.ts` beside `foo.js` is dropped: it is emitted from the same
+ * code and repeats its constants as literal types, so every key or URL in
+ * dist/ was reported twice. A declaration file with no JS beside it is kept.
  */
 function dropCompiledDuplicates(files: string[]): string[] {
   const COMPILED = new Set([".js", ".mjs", ".cjs"]);
   const SOURCE = [".ts", ".tsx", ".mts", ".cts"];
+  const DECLARATION = /\.d\.[cm]?ts$/i;
 
   const present = new Set(files);
   return files.filter((f) => {
+    const decl = DECLARATION.exec(f);
+    if (decl) {
+      const stem = f.slice(0, decl.index);
+      return ![...COMPILED].some((c) => present.has(stem + c));
+    }
     const ext = extname(f).toLowerCase();
     if (!COMPILED.has(ext)) return true;
     const stem = f.slice(0, -ext.length);
@@ -33,7 +49,7 @@ function dropCompiledDuplicates(files: string[]): string[] {
   });
 }
 
-async function walkDir(dir: string, files: string[]): Promise<void> {
+async function walkDir(dir: string, files: string[], skipDirs: ReadonlySet<string>): Promise<void> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
@@ -42,11 +58,11 @@ async function walkDir(dir: string, files: string[]): Promise<void> {
   }
 
   for (const entry of entries) {
-    if (SKIP_DIRS.has(entry.name)) continue;
+    if (skipDirs.has(entry.name)) continue;
 
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      await walkDir(fullPath, files);
+      await walkDir(fullPath, files, skipDirs);
     } else if (entry.isFile()) {
       if (SKIP_FILES.has(entry.name) || SKIP_FILE_RE.test(entry.name)) continue;
       const ext = extname(entry.name).toLowerCase();

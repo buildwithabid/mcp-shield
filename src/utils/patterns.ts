@@ -206,14 +206,10 @@ export const SCANNABLE_EXTENSIONS: ReadonlySet<string> = new Set([
   ".tf", ".tfvars",
 ]);
 
-/** Files/dirs to skip during scanning */
+/** Dirs skipped in every scan: dependencies, VCS metadata, coverage reports and tool caches */
 export const SKIP_DIRS: ReadonlySet<string> = new Set([
   "node_modules",
   ".git",
-  "dist",
-  "build",
-  "out",
-  ".next",
   "coverage",
   "__pycache__",
   ".venv",
@@ -221,6 +217,21 @@ export const SKIP_DIRS: ReadonlySet<string> = new Set([
   ".tox",
   ".mypy_cache",
   ".pytest_cache",
+]);
+
+/**
+ * Build output, skipped only in local scans.
+ *
+ * In a project checkout these are compiled copies of the source beside them, and
+ * bundled chunks (a Next.js .next/ is full of eval) produced false CRITICAL
+ * findings for code the user never wrote. A published package is the opposite
+ * case: dist/ or build/ is often the only code it ships, so package scans read it.
+ */
+export const BUILD_OUTPUT_DIRS: ReadonlySet<string> = new Set([
+  "dist",
+  "build",
+  "out",
+  ".next",
 ]);
 
 /**

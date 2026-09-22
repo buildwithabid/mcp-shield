@@ -37,6 +37,8 @@ export interface ScanConfig {
   packageName?: string;
   /** Package version if scanning an npm package */
   packageVersion?: string;
+  /** "package" for a downloaded npm package, "local" (default) for a project directory */
+  mode?: ScanMode;
   /** Whether to skip slow checks (rug-pull, etc.) */
   quick: boolean;
   /** Output format */
@@ -50,6 +52,8 @@ export interface ScanConfig {
 }
 
 export type ReportFormat = "terminal" | "json" | "markdown";
+
+export type ScanMode = "local" | "package";
 
 export interface ScanResult {
   /** Target that was scanned */
