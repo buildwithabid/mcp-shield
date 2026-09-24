@@ -177,12 +177,11 @@ Package scans query the npm registry:
 - Packages mimicking official naming
 - Missing or minimal package description
 
-Local scans read the project's `package.json` scripts:
+Package and local scans both read the target's `package.json`:
 
-- Suspicious lifecycle scripts (`preinstall`, `postinstall`, `preuninstall`, `postuninstall`)
+- Suspicious lifecycle scripts (`preinstall`, `postinstall`, `preuninstall`, `postuninstall`). npm runs these on install, so a package scan reports them before you install.
 - Scripts downloading remote code
-
-Both: missing repository declaration.
+- Missing repository declaration
 
 ---
 

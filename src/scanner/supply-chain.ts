@@ -14,11 +14,7 @@ export const supplyChainScanner: Scanner = {
   async run(config: ScanConfig, _cache: FileCache): Promise<Finding[]> {
     const findings: Finding[] = [];
 
-    if (!config.packageName) {
-      // Local project — check package.json metadata
-      const localFindings = await checkLocalPackage(config.targetPath);
-      findings.push(...localFindings);
-    } else {
+    if (config.packageName) {
       // npm package — check registry metadata
       const registryFindings = await checkNpmRegistry(config.packageName);
       findings.push(...registryFindings);
@@ -27,6 +23,11 @@ export const supplyChainScanner: Scanner = {
       const typoFindings = checkTyposquatting(config.packageName);
       findings.push(...typoFindings);
     }
+
+    // Check package.json scripts. npm runs install hooks on install, so a
+    // package scan (the pre-install check) needs this as much as a local one.
+    const scriptFindings = await checkPackageScripts(config.targetPath);
+    findings.push(...scriptFindings);
 
     // Check source repo matches declared repo
     const repoFindings = await checkRepoIntegrity(config.targetPath);
@@ -141,7 +142,7 @@ function checkTyposquatting(packageName: string): Finding[] {
   return findings;
 }
 
-async function checkLocalPackage(targetPath: string): Promise<Finding[]> {
+async function checkPackageScripts(targetPath: string): Promise<Finding[]> {
   const findings: Finding[] = [];
 
   try {
