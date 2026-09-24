@@ -20,7 +20,7 @@ export const toolDescriptionScanner: Scanner = {
         findings.push(...descFindings);
       }
 
-      const allDescFindings = scanAllDescriptionFields(content, relPath);
+      const allDescFindings = scanAllDescriptionFields(content, relPath, toolDefs);
       findings.push(...allDescFindings);
     }
 
@@ -80,7 +80,11 @@ function scanDescription(description: string, toolName: string, file: string, li
   return findings;
 }
 
-function scanAllDescriptionFields(content: string, relPath: string): Finding[] {
+function scanAllDescriptionFields(
+  content: string,
+  relPath: string,
+  toolDefs: ReadonlyArray<{ descriptionText: string; line: number }>
+): Finding[] {
   const findings: Finding[] = [];
   const lines = content.split("\n");
   const descPattern = /description\s*[:=]\s*["'`]([\s\S]*?)["'`]/g;
@@ -92,6 +96,10 @@ function scanAllDescriptionFields(content: string, relPath: string): Finding[] {
     let match: RegExpExecArray | null;
     while ((match = descPattern.exec(line)) !== null) {
       const descValue = match[1]!;
+
+      // Tool descriptions were already scanned by scanDescription, which names
+      // the tool. Scanning them again here reported every injection twice.
+      if (toolDefs.some((t) => t.line === i + 1 && t.descriptionText === descValue)) continue;
 
       for (const pattern of INJECTION_PATTERNS) {
         pattern.pattern.lastIndex = 0;
