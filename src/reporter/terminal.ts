@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ScanResult, Finding, Severity, ScannerName } from "../types.js";
 import { SCANNER_DISPLAY_NAMES } from "../types.js";
+
+const PKG_VERSION: string = (JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf-8")) as { version: string }).version;
 
 const SEVERITY_ICONS: Record<Severity, string> = {
   critical: "\x1b[31m\u{1F534} CRITICAL\x1b[0m",
@@ -23,7 +27,7 @@ export function formatTerminal(result: ScanResult): string {
 
   // Header
   lines.push("");
-  lines.push(`${BOLD}\u{1F6E1}\u{FE0F}  mcp-shield \u2014 MCP Security Scanner${RESET}`);
+  lines.push(`${BOLD}\u{1F6E1}\u{FE0F}  mcp-shield v${PKG_VERSION} \u2014 MCP Security Scanner${RESET}`);
   lines.push("");
   lines.push(`${BOLD}Scanning:${RESET} ${result.target}${result.version ? ` v${result.version}` : ""}`);
   lines.push("\u2501".repeat(50));

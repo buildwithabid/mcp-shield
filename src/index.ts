@@ -31,9 +31,9 @@ program
       process.exit(1);
     }
 
+    // The banner is printed by the terminal reporter, so it also appears in
+    // --output files and MCP get_report output; printing it here doubled it.
     if (format === "terminal") {
-      console.log("");
-      console.log(`\x1b[1m\u{1F6E1}\u{FE0F}  mcp-shield v${PKG_VERSION} \u2014 MCP Security Scanner\x1b[0m`);
       console.log("");
       console.log(`Resolving target: ${target}...`);
     }

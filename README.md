@@ -74,13 +74,11 @@ npx @buildwithabid/mcp-shield scan @some/mcp-server --quick
 ### Example Output
 
 ```
-🛡️  mcp-shield v1.1.1 — MCP Security Scanner
-
 Resolving target: @example/mcp-server-db...
 Scanning: @example/mcp-server-db v2.1.0
 
 
-🛡️  mcp-shield — MCP Security Scanner
+🛡️  mcp-shield v1.1.1 — MCP Security Scanner
 
 Scanning: @example/mcp-server-db v2.1.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
