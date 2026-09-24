@@ -1,6 +1,6 @@
 {
   "name": "@buildwithabid/mcp-shield",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Security scanner for MCP servers. Find vulnerabilities before your AI agent does.",
   "main": "dist/index.js",
   "bin": {
